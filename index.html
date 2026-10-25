@@ -37,9 +37,12 @@ main{padding:18px 24px 32px;display:flex;flex-direction:column;gap:16px;max-widt
 .wh div{border-radius:12px;padding:14px;text-align:center}.wh b{display:block;font-size:20px;margin:6px 0 2px}
 .hl div{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);line-height:1.4}.hl div:last-child{border:0}.hl span{font-weight:800}
 .dt{overflow-x:auto}.dt .r{display:grid;grid-template-columns:190px minmax(180px,1fr) 44px 44px 44px 48px;gap:8px;align-items:center;padding:7px 10px;font-size:13px;min-width:600px}
-.dt .r:nth-child(even){background:var(--row)}.dt .h{font-size:11px;font-weight:700;color:var(--mut);letter-spacing:.5px}.dt .r>div:nth-child(n+3){text-align:right}
+.dt .h{font-size:11px;font-weight:700;color:var(--mut);letter-spacing:.5px}.dt .r>div:nth-child(n+3){text-align:right}
 .bar{display:flex;height:14px;border-radius:4px;overflow:hidden}.empty{color:var(--mut);text-align:center;padding:30px 0}
 svg text{font-family:inherit}
+.dt details>summary{list-style:none;cursor:pointer}.dt summary::-webkit-details-marker{display:none}.car{display:inline-block;color:var(--mut);transition:transform .15s}details[open]>summary .car{transform:rotate(90deg)}.dt details:nth-of-type(even)>summary{background:var(--row)}
+.sub{background:var(--row);border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow-x:auto}.sub .u{display:grid;grid-template-columns:90px 1.3fr 1.3fr 56px 1.2fr 110px;gap:8px;padding:6px 10px;font-size:12px;min-width:700px;align-items:center}.sub .u.h{font-size:10px;font-weight:700;color:var(--mut);letter-spacing:.5px}.sub .u:not(.h){border-top:1px solid var(--line)}
+.chip{color:#fff;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap}.tb{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}.tb input{flex:1;min-width:200px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit}.tb button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
 </style>
 </head>
 <body>
@@ -59,26 +62,26 @@ svg text{font-family:inherit}
 <div class="card"><h2>4 · Nilai Persediaan pada 2 Warehouse</h2><div class="wh" id="cWh"></div></div>
 <div class="card"><h2>5 · Highlight</h2><div class="hl" id="cHl"></div></div>
 </div>
-<div class="card"><h2>Rincian Aset per Jenis</h2><div class="dt" id="cDet"></div></div>
+<div class="card"><h2>Rincian Aset per Jenis</h2><div class="tb"><input id="q" placeholder="Cari kode unit, jenis, lokasi…"><button id="ex" type="button">Buka / tutup semua</button></div><div class="dt" id="cDet"></div></div>
 </main>
 <script>
 const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],MS=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-const S={aset:null,w1:null,w2:null,tot:null,bln:{}};
+const OPEN=new Set();let LK=[];const S={aset:null,w1:null,w2:null,tot:null,bln:{}};
 const $=i=>document.getElementById(i),nf=(v,d=0)=>v.toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d});
 const rp=v=>v>=1e9?'Rp'+nf(v/1e9,2)+' Miliar':'Rp'+nf(v/1e6,2)+' Juta';
 const sum=a=>a.reduce((x,y)=>x+y,0),pc=(a,b)=>b?Math.round(a/b*100):0;
 const CAT=[['tanah|bangunan','Tanah & Bangunan'],['viar','Motor VIAR'],['honda|motor','Motor Honda'],['pick ?up','Pick Up'],['dyna|dump','Truck Dyna / Dump Truck'],['tronton','Tronton'],['wheel','Wheel Loader'],['backhoe','Backhoe Loader'],['skid','Skid Steer Loader'],['excavator','Excavator'],['crane','Crane'],['forklift','Forklift'],['grab','Clamshell Grab'],['spreader','Spreader Bar'],['sweeper','Sweeper']];
 const kat=j=>{j=String(j||'').toLowerCase();for(const[k,n]of CAT)if(new RegExp(k).test(j))return n;return 'Lainnya'};
 $('bln').innerHTML=MN.map((m,i)=>`<option value="${i}"${i==8?' selected':''}>${m}</option>`).join('');
-['bln','thn','std'].forEach(i=>$(i).addEventListener('input',render));
+['bln','thn','std','q'].forEach(i=>$(i).addEventListener('input',render));$('ex').onclick=()=>{const all=LK.length&&LK.every(k=>OPEN.has(k));OPEN.clear();if(!all)LK.forEach(k=>OPEN.add(k));render()};$('cDet').addEventListener('toggle',e=>{const d=e.target;if(d.tagName==='DETAILS'&&!($('q').value||'').trim()){d.open?OPEN.add(d.dataset.k):OPEN.delete(d.dataset.k)}},true);
 const hdr=(rows,key)=>{for(let i=0;i<Math.min(rows.length,15);i++)if(rows[i].some(x=>String(x==null?'':x).trim().toUpperCase()===key))return i;return -1};
 const col=(h,f)=>h.findIndex(x=>f(String(x==null?'':x).trim().toUpperCase()));
 async function readFile(f){
  const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
  const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:null});
  const n=f.name.toLowerCase();let h=hdr(rows,'KODE UNIT');
- if(h>=0){const H=rows[h],ik=col(H,x=>x==='KODE UNIT'),ij=col(H,x=>x.startsWith('KELOMPOK')),is=col(H,x=>x.includes('HASIL'));
-  S.aset=rows.slice(h+1).filter(r=>r[ik]!=null&&String(r[ik]).trim()!=='').map(r=>({j:r[ij],s:String(r[is]||'').toLowerCase()}));return 'Aset'}
+ if(h>=0){const H=rows[h],ik=col(H,x=>x==='KODE UNIT'),ij=col(H,x=>x.startsWith('KELOMPOK')),is=col(H,x=>x.includes('HASIL')),isp=col(H,x=>x==='SPESIFIKASI'),ikp=col(H,x=>x==='KAPASITAS'),ith=col(H,x=>x.startsWith('TAHUN')),iu=col(H,x=>x==='USER'),il=col(H,x=>x.startsWith('LOKASI')),g=(r,i)=>i>=0&&r[i]!=null&&String(r[i]).trim()!==''?String(r[i]).trim():'–';
+  S.aset=rows.slice(h+1).filter(r=>r[ik]!=null&&String(r[ik]).trim()!=='').map(r=>({j:r[ij],s:String(r[is]||'').toLowerCase(),kode:g(r,ik),jn:g(r,ij),sp:g(r,isp),kap:g(r,ikp),th:g(r,ith),us:g(r,iu),lk:g(r,il)}));return 'Aset'}
  h=hdr(rows,'ITEM_CODE');
  if(h>=0){const H=rows[h].map(x=>String(x||'').trim().toUpperCase()),ic=H.indexOf('ITEM_CODE'),is=H.indexOf('STOCK_AKHIR'),it=H.indexOf('TOTAL_HARGA'),ik=H.indexOf('KLASIFIKASI');
   const d=rows.slice(h+1).filter(r=>r[ic]!=null&&String(r[ic]).trim()!==''&&typeof r[it]==='number').map(r=>({st:+r[is]||0,t:r[it],k:String(r[ik]||'').trim().toLowerCase()}));
@@ -122,10 +125,15 @@ function render(){
   H.push([pc(Sp,base)<=25,`Security parts berada di level ${pc(Sp,base)}% dari total persediaan.`]);
   H.push([cnt('dead')===0,cnt('dead')===0?`Tidak terdapat dead stock (>5 tahun) pada ${per}.`:`Terdapat ${cnt('dead')} item dead stock senilai ${rp(D)}.`])}
  $('cHl').innerHTML=H.length?H.map(x=>`<div><span style="color:${x[0]?'var(--ok)':'var(--warn)'}">${x[0]?'✓':'!'}</span><div style="border:0;padding:0">${x[1]}</div></div>`).join(''):'<div class="empty" style="width:100%">Highlight muncul setelah data persediaan diunggah</div>';
- const m={};if(a)a.forEach(x=>{const k=kat(x.j);m[k]=m[k]||[0,0,0];m[k][x.s.includes('tidak')?2:x.s.includes('non')?1:0]++});
+ const m={},IT={};if(a)a.forEach(x=>{const k=kat(x.j);m[k]=m[k]||[0,0,0];m[k][x.s.includes('tidak')?2:x.s.includes('non')?1:0]++;(IT[k]=IT[k]||[]).push(x)});
  const L=Object.entries(m).sort((x,y)=>sum(y[1])-sum(x[1])),mxv=Math.max(1,...L.map(x=>sum(x[1])));
  const c3=['#2563EB','#F2B134','#E8743B'],z=n=>n||'–';
- $('cDet').innerHTML=L.length?'<div class="r h"><div>JENIS ASET</div><div>KOMPOSISI</div><div>PROD</div><div>NON</div><div>RUSAK</div><div>TOTAL</div></div>'+L.map(([k,q])=>`<div class="r"><div style="font-weight:600">${k}</div><div class="bar" style="width:${sum(q)/mxv*100}%">${q.map((n,i)=>n?`<div style="flex:${n};background:${c3[i]}"></div>`:'').join('')}</div><div>${z(q[0])}</div><div>${z(q[1])}</div><div>${z(q[2])}</div><div><b>${sum(q)}</b></div></div>`).join('')+`<div class="r" style="font-weight:800"><div>TOTAL</div><div></div><div>${P}</div><div>${N}</div><div>${R}</div><div>${A}</div></div>`:'<div class="empty">Unggah file Total Asset Tercatat</div>'}
+ const q0=($('q').value||'').toLowerCase().trim();LK=L.map(x=>x[0]);
+ const st=x=>x.s.includes('tidak')?['Rusak berat','#D9622B']:x.s.includes('non')?['Non-produktif','#A86F00']:['Produktif','#2563EB'];
+ const itm=k=>(IT[k]||[]).filter(x=>!q0||(k+' '+x.kode+' '+x.jn+' '+x.sp+' '+x.us+' '+x.lk).toLowerCase().includes(q0));
+ const body=L.filter(([k])=>!q0||itm(k).length).map(([k,q])=>`<details data-k="${k}"${OPEN.has(k)||q0?' open':''}><summary class="r"><div style="font-weight:600"><span class="car">▸</span> ${k}</div><div class="bar" style="width:${sum(q)/mxv*100}%">${q.map((n,i)=>n?`<div style="flex:${n};background:${c3[i]}"></div>`:'').join('')}</div><div>${z(q[0])}</div><div>${z(q[1])}</div><div>${z(q[2])}</div><div><b>${sum(q)}</b></div></summary><div class="sub"><div class="u h"><div>KODE UNIT</div><div>NAMA / JENIS</div><div>SPESIFIKASI</div><div>TAHUN</div><div>USER · LOKASI</div><div>STATUS</div></div>${itm(k).map(x=>`<div class="u"><div><b>${x.kode}</b></div><div>${x.jn}</div><div>${x.sp}${x.kap!=='–'?' · '+x.kap:''}</div><div>${x.th}</div><div>${x.us}${x.lk!==x.us&&x.lk!=='–'?' · '+x.lk:''}</div><div><span class="chip" style="background:${st(x)[1]}">${st(x)[0]}</span></div></div>`).join('')}</div></details>`).join('');
+ $('cDet').innerHTML=L.length?'<div class="r h"><div>JENIS ASET (klik untuk melihat unit)</div><div>KOMPOSISI</div><div>PROD</div><div>NON</div><div>RUSAK</div><div>TOTAL</div></div>'+(body||'<div class="empty">Tidak ada aset yang cocok dengan pencarian</div>')+`<div class="r" style="font-weight:800"><div>TOTAL</div><div></div><div>${P}</div><div>${N}</div><div>${R}</div><div>${A}</div></div>`:'<div class="empty">Unggah file Total Asset Tercatat</div>'
+}
 render();
 </script>
 </body>
