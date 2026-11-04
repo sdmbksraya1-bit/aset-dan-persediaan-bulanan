@@ -41,6 +41,7 @@ main{padding:18px 24px 32px;display:flex;flex-direction:column;gap:16px;max-widt
 .bar{display:flex;height:14px;border-radius:4px;overflow:hidden}.empty{color:var(--mut);text-align:center;padding:30px 0}
 svg text{font-family:inherit}
 .dt details>summary{list-style:none;cursor:pointer}.dt summary::-webkit-details-marker{display:none}.car{display:inline-block;color:var(--mut);transition:transform .15s}details[open]>summary .car{transform:rotate(90deg)}.dt details:nth-of-type(even)>summary{background:var(--row)}
+.wm{overflow-x:auto;margin-top:14px}.wm .r{display:grid;grid-template-columns:90px 1fr 1fr 1fr;gap:8px;padding:7px 10px;font-size:13px;min-width:440px;border-top:1px solid var(--line);cursor:pointer}.wm .r>div:nth-child(n+2){text-align:right}.wm .r.h{font-size:11px;font-weight:700;color:var(--mut);cursor:default;border-top:0}.wm .r.s{background:var(--row);font-weight:800}.wm .r:not(.h):hover{background:var(--row)}
 .sub{background:var(--row);border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow-x:auto}.sub .u{display:grid;grid-template-columns:90px 1.2fr 1.2fr 1.1fr 56px 1.1fr 110px;gap:8px;padding:6px 10px;font-size:12px;min-width:820px;align-items:center}.sub .u.h{font-size:10px;font-weight:700;color:var(--mut);letter-spacing:.5px}.sub .u:not(.h){border-top:1px solid var(--line)}
 .chip{color:#fff;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap}.tb{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}.tb input{flex:1;min-width:200px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 10px;font:inherit}.tb button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
 </style>
@@ -59,14 +60,14 @@ svg text{font-family:inherit}
 <div class="card"><h2>1 · Data Aset</h2><div class="row" id="cAset"></div></div>
 <div class="card"><h2>2 · Trend Nilai Persediaan</h2><div id="cTrend"></div></div>
 <div class="card"><h2>3 · Komposisi Nilai Persediaan</h2><div class="row" id="cKomp"></div></div>
-<div class="card"><h2>4 · Nilai Persediaan pada 2 Warehouse</h2><div class="wh" id="cWh"></div></div>
+<div class="card"><h2>4 · Nilai Persediaan pada 2 Warehouse</h2><div class="wh" id="cWh"></div><div class="wm" id="cWhM"></div></div>
 <div class="card"><h2>5 · Highlight</h2><div class="hl" id="cHl"></div></div>
 </div>
 <div class="card"><h2>Rincian Aset per Jenis</h2><div class="tb"><input id="q" placeholder="Cari kode unit, serial number, jenis, lokasi…"><button id="ex" type="button">Buka / tutup semua</button></div><div class="dt" id="cDet"></div></div>
 </main>
 <script>
 const MN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],MS=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-const OPEN=new Set();let LK=[];const S={aset:null,w1:null,w2:null,tot:null,bln:{}};
+const OPEN=new Set();let LK=[];const S={aset:{},mo:{}};
 const $=i=>document.getElementById(i),nf=(v,d=0)=>v.toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d});
 const rp=v=>v>=1e9?'Rp'+nf(v/1e9,2)+' Miliar':'Rp'+nf(v/1e6,2)+' Juta';
 const sum=a=>a.reduce((x,y)=>x+y,0),pc=(a,b)=>b?Math.round(a/b*100):0;
@@ -74,24 +75,29 @@ const CAT=[['tanah|bangunan','Tanah & Bangunan'],['viar','Motor VIAR'],['honda|m
 const kat=j=>{j=String(j||'').toLowerCase();for(const[k,n]of CAT)if(new RegExp(k).test(j))return n;return 'Lainnya'};
 $('bln').innerHTML=MN.map((m,i)=>`<option value="${i}"${i==8?' selected':''}>${m}</option>`).join('');
 ['bln','thn','std','q'].forEach(i=>$(i).addEventListener('input',render));$('ex').onclick=()=>{const all=LK.length&&LK.every(k=>OPEN.has(k));OPEN.clear();if(!all)LK.forEach(k=>OPEN.add(k));render()};$('cDet').addEventListener('toggle',e=>{const d=e.target;if(d.tagName==='DETAILS'&&!($('q').value||'').trim()){d.open?OPEN.add(d.dataset.k):OPEN.delete(d.dataset.k)}},true);
+$('cWhM').addEventListener('click',e=>{const r=e.target.closest('[data-m]');if(r){$('bln').value=r.dataset.m;render()}});
 const hdr=(rows,key)=>{for(let i=0;i<Math.min(rows.length,15);i++)if(rows[i].some(x=>String(x==null?'':x).trim().toUpperCase()===key))return i;return -1};
 const col=(h,f)=>h.findIndex(x=>f(String(x==null?'':x).trim().toUpperCase()));
 async function readFile(f){
  const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
  const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:null});
- const n=f.name.toLowerCase();let h=hdr(rows,'KODE UNIT');
+ const n=f.name.toLowerCase().replace(/_/g,' ');
+ const flt=String(rows.slice(0,6).flat().find(x=>/from date/i.test(String(x||'')))||'');
+ const dm=flt.match(/from date\s*:\s*\d{1,2}-(\d{1,2})-\d{4}/i);
+ let m=dm?+dm[1]-1:MN.findIndex(x=>n.includes(x.toLowerCase()));
+ if(m<0)m=+$('bln').value;
+ let h=hdr(rows,'KODE UNIT');
  if(h>=0){const H=rows[h],ik=col(H,x=>x==='KODE UNIT'),ij=col(H,x=>x.startsWith('KELOMPOK')),is=col(H,x=>x.includes('HASIL')),isp=col(H,x=>x==='SPESIFIKASI'),ikp=col(H,x=>x==='KAPASITAS'),isn=col(H,x=>x.startsWith('SERIAL')),ith=col(H,x=>x.startsWith('TAHUN')),iu=col(H,x=>x==='USER'),il=col(H,x=>x.startsWith('LOKASI')),g=(r,i)=>i>=0&&r[i]!=null&&String(r[i]).trim()!==''?String(r[i]).trim():'–';
-  S.aset=rows.slice(h+1).filter(r=>r[ik]!=null&&String(r[ik]).trim()!=='').map(r=>({j:r[ij],s:String(r[is]||'').toLowerCase(),kode:g(r,ik),jn:g(r,ij),sp:g(r,isp),kap:g(r,ikp),sn:g(r,isn),th:g(r,ith),us:g(r,iu),lk:g(r,il)}));return 'Aset'}
+  S.aset[m]=rows.slice(h+1).filter(r=>r[ik]!=null&&String(r[ik]).trim()!=='').map(r=>({j:r[ij],s:String(r[is]||'').toLowerCase(),kode:g(r,ik),jn:g(r,ij),sp:g(r,isp),kap:g(r,ikp),sn:g(r,isn),th:g(r,ith),us:g(r,iu),lk:g(r,il)}));return 'Aset'}
  h=hdr(rows,'ITEM_CODE');
  if(h>=0){const H=rows[h].map(x=>String(x||'').trim().toUpperCase()),ic=H.indexOf('ITEM_CODE'),is=H.indexOf('STOCK_AKHIR'),it=H.indexOf('TOTAL_HARGA'),ik=H.indexOf('KLASIFIKASI');
   const d=rows.slice(h+1).filter(r=>r[ic]!=null&&String(r[ic]).trim()!==''&&typeof r[it]==='number').map(r=>({st:+r[is]||0,t:r[it],k:String(r[ik]||'').trim().toLowerCase()}));
-  const m=MN.findIndex(x=>n.includes(x.toLowerCase()));
-  if(/whs\s*_?1|biringkassi/.test(n)){S.w1=d;return 'WHS1'}
-  if(/whs\s*_?2|palu/.test(n)){S.w2=d;return 'WHS2'}
-  if(m>=0){S.bln[m]=sum(d.map(x=>x.t));return 'Bulanan'}
-  S.tot=d;return 'Total'}
+  const o=S.mo[m]=S.mo[m]||{},wm=flt.match(/whs\s*:\s*(\w+)/i),w=wm?wm[1].toLowerCase():'';
+  if(w==='whs1'||/whs ?1|biringkassi/.test(n)){o.w1=d;return 'WHS1'}
+  if(w==='whs2'||/whs ?2|palu/.test(n)){o.w2=d;return 'WHS2'}
+  o.all=d;return 'Bulanan'}
  return null}
-async function load(files){const bad=[];for(const f of files){try{if(!await readFile(f))bad.push(f.name)}catch(e){bad.push(f.name)}}render();if(bad.length)alert('File tidak dikenali (cek isi atau nama file):\n'+bad.join('\n'))}
+async function load(files){const bad=[];for(const f of files){try{if(!await readFile(f))bad.push(f.name)}catch(e){bad.push(f.name)}}const ks=[...Object.keys(S.mo),...Object.keys(S.aset)].map(Number);if(ks.length&&!ks.includes(+$('bln').value))$('bln').value=Math.max(...ks);render();if(bad.length)alert('File tidak dikenali (cek isi atau nama file):\n'+bad.join('\n'))}
 $('fi').addEventListener('change',e=>load(e.target.files));
 const dr=$('drop');['dragover','dragenter'].forEach(t=>dr.addEventListener(t,e=>{e.preventDefault();dr.classList.add('on')}));
 ['dragleave','drop'].forEach(t=>dr.addEventListener(t,e=>{e.preventDefault();dr.classList.remove('on')}));
@@ -102,23 +108,26 @@ function donut(sg,c,s){const R=52,C=2*Math.PI*R,T=sum(sg.map(x=>x.v))||1;let o=0
 const lg=(c,n,v)=>`<div><span style="color:${c}">●</span> ${n} <b>${v}</b></div>`;
 function render(){
  const sel=+$('bln').value,std=+$('std').value||1.7e9,per=MN[sel]+' '+$('thn').value;
- const inv=(S.w1||S.w2)?[...(S.w1||[]),...(S.w2||[])]:(S.tot||[]);
- const tot=sum(inv.map(x=>x.t)),a=S.aset,A=a?a.length:0;
+ const o=S.mo[sel]||{},inv=(o.w1&&o.w2)?[...o.w1,...o.w2]:(o.all||[...(o.w1||[]),...(o.w2||[])]);
+ const mt=i=>{const q=S.mo[i];if(!q)return null;const l=(q.w1&&q.w2)?[...q.w1,...q.w2]:(q.all||(q.w1||q.w2));return l?sum(l.map(x=>x.t)):null};
+ const tot=sum(inv.map(x=>x.t)),a=S.aset[sel]||null,A=a?a.length:0;
  let P=0,N=0,R=0;if(a)a.forEach(x=>{if(x.s.includes('tidak'))R++;else if(x.s.includes('non'))N++;else if(x.s.includes('produktif'))P++});
- const nb=Object.keys(S.bln).length;
- $('chk').innerHTML=[['Aset',!!a],['WHS1 Biringkassi',!!S.w1],['WHS2 Palu',!!S.w2],['Bulanan ('+nb+' bulan)',nb>0]].map(x=>`<i class="${x[1]?'y':''}">${x[1]?'✓':'○'} ${x[0]}</i>`).join('');
+ const nA=Object.keys(S.aset).length,ks=f=>Object.values(S.mo).filter(f).length;
+ $('chk').innerHTML=[['Aset ('+nA+' bulan)',nA>0],['WHS1 Biringkassi ('+ks(x=>x.w1)+' bulan)',ks(x=>x.w1)>0],['WHS2 Palu ('+ks(x=>x.w2)+' bulan)',ks(x=>x.w2)>0],['Total bulanan ('+ks(x=>x.all)+' bulan)',ks(x=>x.all)>0]].map(x=>`<i class="${x[1]?'y':''}">${x[1]?'✓':'○'} ${x[0]}</i>`).join('');
  $('kpi').innerHTML=[['TOTAL ASET',A+' Unit','tercatat fisik'],['ASET PRODUKTIF',P+' Unit',pc(P,A)+'% dari total'],['ASET NON-PRODUKTIF',N+' Unit',pc(N,A)+'% dari total'],['ASET RUSAK BERAT',R+' Unit',pc(R,A)+'% · usulan hapus'],['TOTAL NILAI PERSEDIAAN',tot?rp(tot):'–',tot?'Rp'+nf(tot):'belum ada data']].map(x=>`<div class="card"><small>${x[0]}</small><b>${x[1]}</b><em>${x[2]}</em></div>`).join('');
- $('cAset').innerHTML=A?donut([{v:P,c:'#2563EB'},{v:N,c:'#F2B134'},{v:R,c:'#E8743B'}],A,'unit')+'<div class="lg">'+lg('#2563EB','Produktif',P)+lg('#F2B134','Non-produktif',N)+lg('#E8743B','Rusak berat',R)+'</div>':'<div class="empty" style="width:100%">Unggah file Total Asset Tercatat</div>';
+ $('cAset').innerHTML=A?donut([{v:P,c:'#2563EB'},{v:N,c:'#F2B134'},{v:R,c:'#E8743B'}],A,'unit')+'<div class="lg">'+lg('#2563EB','Produktif',P)+lg('#F2B134','Non-produktif',N)+lg('#E8743B','Rusak berat',R)+'</div>':'<div class="empty" style="width:100%">Belum ada data aset '+MN[sel]+' · unggah file Total Asset Tercatat bulan ini</div>';
  const cl=k=>inv.filter(x=>x.k.startsWith(k)),val=k=>sum(cl(k).map(x=>x.t)),cnt=k=>cl(k).filter(x=>x.st>0).length;
  const F=val('fast'),Sl=val('slow'),Sp=val('security'),D=val('dead'),base=F+Sl+Sp+D||1;
- $('cKomp').innerHTML=tot?donut([{v:F,c:'#6D3FA8'},{v:Sl,c:'#D63DA8'},{v:Sp,c:'#E8743B'}],rp(tot).replace('Rp','').replace(' Miliar',' M').replace(' Juta',' Jt'),'total')+'<div class="lg">'+[['#6D3FA8','Fast Moving',F,'fast'],['#D63DA8','Slow Moving',Sl,'slow'],['#E8743B','Security Part',Sp,'security']].map(x=>lg(x[0],x[1],pc(x[2],base)+'%')+`<div style="color:var(--mut);font-size:12px;margin:-4px 0 6px 18px">Rp${nf(x[2]/1e6,2)} Juta · ${cnt(x[3])} item</div>`).join('')+'</div>':'<div class="empty" style="width:100%">Unggah file WHS1 dan WHS2</div>';
- const w1=S.w1?sum(S.w1.map(x=>x.t)):0,w2=S.w2?sum(S.w2.map(x=>x.t)):0;
- $('cWh').innerHTML=`<div style="background:#FFF4D6;color:#5C4200"><small><b>WHS1 · BIRINGKASSI</b></small><b>${S.w1?rp(w1):'–'}</b>${S.w1?nf(w1/(w1+w2||1)*100,2)+'%':''}</div><div style="background:#DCEBFA;color:#0E3560"><small><b>WHS2 · PP PALU</b></small><b>${S.w2?rp(w2):'–'}</b>${S.w2?nf(w2/(w1+w2||1)*100,2)+'%':''}</div>`;
- const v=Array(12).fill(null);for(const k in S.bln)v[k]=S.bln[k];if(tot)v[sel]=tot;
+ $('cKomp').innerHTML=tot?donut([{v:F,c:'#6D3FA8'},{v:Sl,c:'#D63DA8'},{v:Sp,c:'#E8743B'}],rp(tot).replace('Rp','').replace(' Miliar',' M').replace(' Juta',' Jt'),'total')+'<div class="lg">'+[['#6D3FA8','Fast Moving',F,'fast'],['#D63DA8','Slow Moving',Sl,'slow'],['#E8743B','Security Part',Sp,'security']].map(x=>lg(x[0],x[1],pc(x[2],base)+'%')+`<div style="color:var(--mut);font-size:12px;margin:-4px 0 6px 18px">Rp${nf(x[2]/1e6,2)} Juta · ${cnt(x[3])} item</div>`).join('')+'</div>':'<div class="empty" style="width:100%">Belum ada data persediaan '+MN[sel]+' · unggah file bulan ini</div>';
+ const w1=o.w1?sum(o.w1.map(x=>x.t)):0,w2=o.w2?sum(o.w2.map(x=>x.t)):0,both=o.w1&&o.w2;
+ $('cWh').innerHTML=`<div style="background:#FFF4D6;color:#5C4200"><small><b>WHS1 · BIRINGKASSI</b></small><b>${o.w1?rp(w1):'–'}</b>${both?nf(w1/(w1+w2||1)*100,2)+'%':(o.w1?'':'file WHS1 belum diunggah')}</div><div style="background:#DCEBFA;color:#0E3560"><small><b>WHS2 · PP PALU</b></small><b>${o.w2?rp(w2):'–'}</b>${both?nf(w2/(w1+w2||1)*100,2)+'%':(o.w2?'':'file WHS2 belum diunggah')}</div>`;
+ const fm=x=>x==null?'–':'Rp'+nf(x/1e6,2)+' Jt',rM=MN.map((_,i)=>{const q=S.mo[i];if(!q)return '';return `<div class="r${i==sel?' s':''}" data-m="${i}"><div>${MN[i]}</div><div>${fm(q.w1?sum(q.w1.map(x=>x.t)):null)}</div><div>${fm(q.w2?sum(q.w2.map(x=>x.t)):null)}</div><div>${fm(mt(i))}</div></div>`}).join('');
+ $('cWhM').innerHTML=rM?'<div class="r h"><div>BULAN</div><div>WHS1 BIRINGKASSI</div><div>WHS2 PALU</div><div>TOTAL</div></div>'+rM+'<div style="font-size:11px;color:var(--mut);padding:8px 10px 0">Klik baris bulan untuk menampilkan seluruh dashboard pada bulan itu. Tanda – berarti file WHS bulan tersebut belum diunggah.</div>':'';
+ const v=Array.from({length:12},(_,i)=>mt(i));
  const nums=v.filter(x=>x!=null).concat(std),mn=Math.floor((Math.min(...nums)-1e8)/1e8)*1e8,mx=Math.ceil((Math.max(...nums)+1e8)/1e8)*1e8;
- const X=i=>46+i*(460/11),Y=t=>20+(mx-t)/(mx-mn)*150,pts=v.map((t,i)=>t==null?null:[X(i),Y(t),t]).filter(Boolean);
+ const X=i=>46+i*(460/11),Y=t=>20+(mx-t)/(mx-mn)*150,pts=v.map((t,i)=>t==null?null:[X(i),Y(t),t,i]).filter(Boolean);
  let g='';for(let k=0;k<=4;k++){const t=mn+(mx-mn)*k/4,y=Y(t);g+=`<line x1="46" x2="506" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="40" y="${y+3}" text-anchor="end" font-size="10" fill="var(--mut)">${nf(t/1e9,2)} M</text>`}
- $('cTrend').innerHTML=pts.length?`<svg viewBox="0 0 520 210" width="100%">${g}<line x1="46" x2="506" y1="${Y(std)}" y2="${Y(std)}" stroke="#14A06F" stroke-width="2" stroke-dasharray="6 4"/><polyline fill="none" stroke="#E5A100" stroke-width="2.5" points="${pts.map(p=>p[0]+','+p[1]).join(' ')}"/>${pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#E5A100"/><text x="${p[0]}" y="${p[1]+16}" text-anchor="middle" font-size="9" font-weight="700" fill="var(--ink)">${nf(p[2]/1e9,2)} M</text>`).join('')}${MS.map((m,i)=>`<text x="${X(i)}" y="195" text-anchor="middle" font-size="10" fill="var(--mut)">${m}</text>`).join('')}</svg><div style="font-size:12px;color:var(--mut)"><span style="color:#E5A100">●</span> Persediaan &nbsp; <span style="color:#14A06F">━</span> Standar Rp${nf(std/1e9,2)} M</div>`:'<div class="empty">Unggah file bulanan atau WHS1 dan WHS2</div>';
+ $('cTrend').innerHTML=pts.length?`<svg viewBox="0 0 520 210" width="100%">${g}<line x1="46" x2="506" y1="${Y(std)}" y2="${Y(std)}" stroke="#14A06F" stroke-width="2" stroke-dasharray="6 4"/><polyline fill="none" stroke="#E5A100" stroke-width="2.5" points="${pts.map(p=>p[0]+','+p[1]).join(' ')}"/>${pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="${p[3]==sel?6:4}" fill="#E5A100" stroke="${p[3]==sel?'var(--ink)':'none'}" stroke-width="2"/><text x="${p[0]}" y="${p[1]+16}" text-anchor="middle" font-size="9" font-weight="700" fill="var(--ink)">${nf(p[2]/1e9,2)} M</text>`).join('')}${MS.map((m,i)=>`<text x="${X(i)}" y="195" text-anchor="middle" font-size="10" fill="var(--mut)">${m}</text>`).join('')}</svg><div style="font-size:12px;color:var(--mut)"><span style="color:#E5A100">●</span> Persediaan &nbsp; <span style="color:#14A06F">━</span> Standar Rp${nf(std/1e9,2)} M</div>`:'<div class="empty">Unggah file bulanan atau WHS1 dan WHS2</div>';
  const H=[];if(tot){H.push([tot<=std,`Total nilai persediaan ${per} sebesar ${rp(tot)} ${tot<=std?'berada di bawah':'MELEBIHI'} standar rata-rata maksimum (${rp(std)}).`]);
   H.push([pc(F,base)>=40,`Nilai fast moving ${pc(F,base)}% dari total persediaan${pc(F,base)<40?': perlu dioptimalkan.':'.'}`]);
   H.push([pc(Sl,base)<=40,`Nilai slow moving ${pc(Sl,base)}%${pc(Sl,base)>40?' cukup tinggi: perlu optimalisasi perputaran.':', masih dalam batas wajar.'}`]);
@@ -132,7 +141,7 @@ function render(){
  const st=x=>x.s.includes('tidak')?['Rusak berat','#D9622B']:x.s.includes('non')?['Non-produktif','#A86F00']:['Produktif','#2563EB'];
  const itm=k=>(IT[k]||[]).filter(x=>!q0||(k+' '+x.kode+' '+x.jn+' '+x.sp+' '+x.sn+' '+x.us+' '+x.lk).toLowerCase().includes(q0));
  const body=L.filter(([k])=>!q0||itm(k).length).map(([k,q])=>`<details data-k="${k}"${OPEN.has(k)||q0?' open':''}><summary class="r"><div style="font-weight:600"><span class="car">▸</span> ${k}</div><div class="bar" style="width:${sum(q)/mxv*100}%">${q.map((n,i)=>n?`<div style="flex:${n};background:${c3[i]}"></div>`:'').join('')}</div><div>${z(q[0])}</div><div>${z(q[1])}</div><div>${z(q[2])}</div><div><b>${sum(q)}</b></div></summary><div class="sub"><div class="u h"><div>KODE UNIT</div><div>NAMA / JENIS</div><div>SPESIFIKASI</div><div>SERIAL NUMBER</div><div>TAHUN</div><div>USER · LOKASI</div><div>STATUS</div></div>${itm(k).map(x=>`<div class="u"><div><b>${x.kode}</b></div><div>${x.jn}</div><div>${x.sp}${x.kap!=='–'?' · '+x.kap:''}</div><div>${x.sn}</div><div>${x.th}</div><div>${x.us}${x.lk!==x.us&&x.lk!=='–'?' · '+x.lk:''}</div><div><span class="chip" style="background:${st(x)[1]}">${st(x)[0]}</span></div></div>`).join('')}</div></details>`).join('');
- $('cDet').innerHTML=L.length?'<div class="r h"><div>JENIS ASET (klik untuk melihat unit)</div><div>KOMPOSISI</div><div>PROD</div><div>NON</div><div>RUSAK</div><div>TOTAL</div></div>'+(body||'<div class="empty">Tidak ada aset yang cocok dengan pencarian</div>')+`<div class="r" style="font-weight:800"><div>TOTAL</div><div></div><div>${P}</div><div>${N}</div><div>${R}</div><div>${A}</div></div>`:'<div class="empty">Unggah file Total Asset Tercatat</div>'
+ $('cDet').innerHTML=L.length?'<div class="r h"><div>JENIS ASET (klik untuk melihat unit)</div><div>KOMPOSISI</div><div>PROD</div><div>NON</div><div>RUSAK</div><div>TOTAL</div></div>'+(body||'<div class="empty">Tidak ada aset yang cocok dengan pencarian</div>')+`<div class="r" style="font-weight:800"><div>TOTAL</div><div></div><div>${P}</div><div>${N}</div><div>${R}</div><div>${A}</div></div>`:'<div class="empty">Belum ada data aset '+MN[sel]+' · unggah file Total Asset Tercatat bulan ini</div>'
 }
 render();
 </script>
