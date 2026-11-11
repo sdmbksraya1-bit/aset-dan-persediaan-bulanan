@@ -102,9 +102,9 @@ $('fi').addEventListener('change',e=>load(e.target.files));
 const dr=$('drop');['dragover','dragenter'].forEach(t=>dr.addEventListener(t,e=>{e.preventDefault();dr.classList.add('on')}));
 ['dragleave','drop'].forEach(t=>dr.addEventListener(t,e=>{e.preventDefault();dr.classList.remove('on')}));
 dr.addEventListener('drop',e=>load(e.dataTransfer.files));
-function donut(sg,c,s){const R=52,C=2*Math.PI*R,T=sum(sg.map(x=>x.v))||1;let o=0,h='<svg viewBox="0 0 140 140" class="dn"><g transform="rotate(-90 70 70)" fill="none" stroke-width="22"><circle cx="70" cy="70" r="52" stroke="var(--line)"/>';
- sg.forEach(x=>{const L=x.v/T*C;if(L>0){h+=`<circle cx="70" cy="70" r="52" stroke="${x.c}" stroke-dasharray="${L} ${C-L}" stroke-dashoffset="${-o}"/>`;o+=L}});
- return h+`</g><text x="70" y="68" text-anchor="middle" font-size="22" font-weight="800" fill="var(--ink)">${c}</text><text x="70" y="86" text-anchor="middle" font-size="10" fill="var(--mut)">${s}</text></svg>`}
+function donut(sg,c,s){const R=52,C=2*Math.PI*R,T=sum(sg.map(x=>x.v))||1;let o=0,lb='',h='<svg viewBox="0 0 140 140" class="dn"><g transform="rotate(-90 70 70)" fill="none" stroke-width="22"><circle cx="70" cy="70" r="52" stroke="var(--line)"/>';
+ sg.forEach(x=>{const L=x.v/T*C;if(L>0){h+=`<circle cx="70" cy="70" r="52" stroke="${x.c}" stroke-dasharray="${L} ${C-L}" stroke-dashoffset="${-o}"/>`;const p=Math.round(x.v/T*100);if(p>=4){const t=(o+L/2)/C*2*Math.PI-Math.PI/2;lb+=`<text x="${(70+52*Math.cos(t)).toFixed(1)}" y="${(70+52*Math.sin(t)).toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="800" fill="${x.c==='#F2B134'?'#10242B':'#fff'}">${p}%</text>`}o+=L}});
+ return h+`</g>${lb}<text x="70" y="68" text-anchor="middle" font-size="22" font-weight="800" fill="var(--ink)">${c}</text><text x="70" y="86" text-anchor="middle" font-size="10" fill="var(--mut)">${s}</text></svg>`}
 const lg=(c,n,v)=>`<div><span style="color:${c}">●</span> ${n} <b>${v}</b></div>`;
 function render(){
  const sel=+$('bln').value,std=+$('std').value||1.7e9,per=MN[sel]+' '+$('thn').value;
